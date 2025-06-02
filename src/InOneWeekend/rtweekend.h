@@ -14,7 +14,8 @@
 #include <iostream>
 #include <limits>
 #include <memory>
-
+#include <random>
+#include <thread>
 
 // C++ Std Usings
 
@@ -35,8 +36,11 @@ inline double degrees_to_radians(double degrees) {
 }
 
 inline double random_double() {
-    // Returns a random real in [0,1).
-    return std::rand() / (RAND_MAX + 1.0);
+    thread_local std::random_device rd;
+    thread_local std::mt19937 generator(rd() + std::hash<std::thread::id>{}(std::this_thread::get_id()));  // 根据线程ID初始化
+    thread_local std::uniform_real_distribution<double> distribution(0.0, 1.0);
+    
+    return distribution(generator);
 }
 
 inline double random_double(double min, double max) {

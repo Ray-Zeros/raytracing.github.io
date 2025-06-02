@@ -13,6 +13,7 @@
 
 #include "hittable.h"
 #include "material.h"
+#include "omp.h"
 
 
 class camera {
@@ -21,6 +22,7 @@ class camera {
     int    image_width       = 100;  // Rendered image width in pixel count
     int    samples_per_pixel = 10;   // Count of random samples for each pixel
     int    max_depth         = 10;   // Maximum number of ray bounces into scene
+    int    num_threads       = 0;    // Number of threads for rendering; 0 stands for auto
 
     double vfov     = 90;              // Vertical view angle (field of view)
     point3 lookfrom = point3(0,0,0);   // Point camera is looking from
@@ -33,17 +35,38 @@ class camera {
     void render(const hittable& world) {
         initialize();
 
+        // OpenMP threads setting
+        if (num_threads > 0){
+            omp_set_num_threads(num_threads);
+        }
+        std::clog << "Rendering with " << omp_get_max_threads() << " threads.\n";
+
         std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
 
-        for (int j = 0; j < image_height; j++) {
-            std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
-            for (int i = 0; i < image_width; i++) {
-                color pixel_color(0,0,0);
-                for (int sample = 0; sample < samples_per_pixel; sample++) {
-                    ray r = get_ray(i, j);
-                    pixel_color += ray_color(r, max_depth, world);
+        // Create a buffer to store the results, avoiding thread conflicts
+        std::vector<std::vector<color>> framebuffer(image_height, std::vector<color>(image_width));
+
+        int block_size = 16;
+        
+        #pragma omp parallel
+        {
+            #pragma omp for schedule(dynamic, block_size)
+            for (int j = 0; j < image_height; j++) {
+                for (int i = 0; i < image_width; i++) {
+                    color pixel_color(0,0,0);
+                    for (int sample = 0; sample < samples_per_pixel; sample++) {
+                        ray r = get_ray(i, j);
+                        pixel_color += ray_color(r, max_depth, world);
+                    }
+                    framebuffer[j][i] = pixel_samples_scale * pixel_color;
                 }
-                write_color(std::cout, pixel_samples_scale * pixel_color);
+            }
+        }
+
+        // Output
+        for (int j = 0; j < image_height; j++) {
+            for (int i = 0; i < image_width; i++) {
+                write_color(std::cout, framebuffer[j][i]);
             }
         }
 
