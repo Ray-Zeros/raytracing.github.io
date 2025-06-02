@@ -1,3 +1,6 @@
+#此项目为 raytracing.github.io 的克隆
+项目地址：https://github.com/RayTracing/raytracing.github.io/tree/release
+
 Ray Tracing in One Weekend Book Series
 ====================================================================================================
 
