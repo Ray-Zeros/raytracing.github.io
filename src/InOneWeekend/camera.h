@@ -14,7 +14,8 @@
 #include "hittable.h"
 #include "material.h"
 #include "omp.h"
-
+#include <mutex>
+#include <iomanip>
 
 class camera {
   public:
@@ -48,6 +49,21 @@ class camera {
 
         int block_size = 16;
         
+        // Update progress
+        std::mutex progress_mutex;
+        int completed_scanlines = 0;
+        auto update_progress = [&]() {
+            std::lock_guard<std::mutex> lock(progress_mutex);
+            completed_scanlines++;
+
+            double progress_percent = 100.0 * completed_scanlines / image_height;
+
+            std::clog << "\r"
+                      << std::fixed << std::setprecision(1) 
+                      << progress_percent << "% (" 
+                      << completed_scanlines << "/" << image_height << " scanlines) " << std::flush;
+        };
+
         #pragma omp parallel
         {
             #pragma omp for schedule(dynamic, block_size)
@@ -60,8 +76,16 @@ class camera {
                     }
                     framebuffer[j][i] = pixel_samples_scale * pixel_color;
                 }
+                // Update progress for each finished line
+                update_progress();
             }
         }
+
+        // Ensure 100% Progress
+        std::clog << "\r" 
+                  << std::fixed << std::setprecision(1) 
+                  << 100.0 << "% (" 
+                  << image_height << "/" << image_height << " scanlines) \n" << std::flush;
 
         // Output
         for (int j = 0; j < image_height; j++) {

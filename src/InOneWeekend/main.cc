@@ -16,9 +16,47 @@
 #include "hittable_list.h"
 #include "material.h"
 #include "sphere.h"
+#include <string>
+#include <chrono>
 
+void usage(const char* program_name) {
+    std::cerr << "Usage: " << program_name << " [options]\n"
+              << "Options:\n"
+              << "  -w <width>      Image width\n"
+              << "  -s <samples>    Samples per pixel\n"
+              << "  -d <depth>      Max ray depth\n"
+              << "  -t <threads>    Thread count (default: 0, use system default)\n"
+              << "  -h              Show this help message\n";
+}
 
-int main() {
+int main(int argc, char* argv[]) {
+    // Default parameters
+    int image_width = 400;
+    int samples_per_pixel = 100;
+    int max_depth = 50;
+    int num_threads = 0;
+
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+        
+        if (arg == "-h") {
+            usage(argv[0]);
+            return 0;
+        } else if (arg == "-w" && i + 1 < argc) {
+            image_width = std::stoi(argv[++i]);
+        } else if (arg == "-s" && i + 1 < argc) {
+            samples_per_pixel = std::stoi(argv[++i]);
+        } else if (arg == "-d" && i + 1 < argc) {
+            max_depth = std::stoi(argv[++i]);
+        } else if (arg == "-t" && i + 1 < argc) {
+            num_threads = std::stoi(argv[++i]);
+        } else {
+            std::cerr << "Unknown option: " << arg << "\n";
+            usage(argv[0]);
+            return 1;
+        }
+    }
+
     hittable_list world;
 
     auto ground_material = make_shared<lambertian>(color(0.5, 0.5, 0.5));
@@ -64,9 +102,10 @@ int main() {
     camera cam;
 
     cam.aspect_ratio      = 16.0 / 9.0;
-    cam.image_width       = 1200;
-    cam.samples_per_pixel = 10;
-    cam.max_depth         = 20;
+    cam.image_width       = image_width;
+    cam.samples_per_pixel = samples_per_pixel;
+    cam.max_depth         = max_depth;
+    cam.num_threads       = num_threads;
 
     cam.vfov     = 20;
     cam.lookfrom = point3(13,2,3);
@@ -76,5 +115,19 @@ int main() {
     cam.defocus_angle = 0.6;
     cam.focus_dist    = 10.0;
 
+    std::clog << "Starting render...\n";
+    std::clog << "Image size: " << image_width << "x" << int(image_width / cam.aspect_ratio) << "\n";
+    std::clog << "Samples per pixel: " << samples_per_pixel << "\n";
+    std::clog << "Max ray depth: " << max_depth << "\n";
+
+    auto render_start_time = std::chrono::high_resolution_clock::now();
+    
     cam.render(world);
+
+    auto render_time = std::chrono::high_resolution_clock::now() - render_start_time;
+    std::clog << "Render completed in " 
+              << std::chrono::duration_cast<std::chrono::seconds>(render_time).count() 
+              << " seconds\n";
+    
+    return 0;
 }
